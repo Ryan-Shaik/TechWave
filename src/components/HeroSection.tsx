@@ -120,7 +120,7 @@ const HeroSection: React.FC = () => {
                 { label: 'Hours', value: timeLeft.hours },
                 { label: 'Minutes', value: timeLeft.minutes },
                 { label: 'Seconds', value: timeLeft.seconds },
-              ].map((item, index) => (
+              ].map((item,) => (
                 <motion.div
                   key={item.label}
                   whileHover={{ scale: 1.05 }}
