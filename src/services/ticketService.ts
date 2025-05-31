@@ -1,6 +1,7 @@
 import { collection, addDoc, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { createPaymentIntent as mockCreatePaymentIntent } from '../api/mockBackend';
+import { testFirebaseConnection } from '../utils/firebaseTest';
 
 export interface TicketPurchase {
   id?: string;
@@ -32,6 +33,11 @@ export interface PaymentIntent {
 }
 
 class TicketService {
+  // Test Firebase connection
+  async testFirebaseConnection() {
+    return await testFirebaseConnection();
+  }
+
   // Create a payment intent on your backend
   async createPaymentIntent(amount: number, currency: string = 'usd'): Promise<PaymentIntent> {
     try {
@@ -51,10 +57,12 @@ class TicketService {
         return await response.json();
       }
       
-      // If backend is not available, use mock for demo
-      throw new Error('Backend not available, using mock');
+      // If backend returns an error, fall back to mock
+      console.warn('Backend API returned error, falling back to mock payment intent');
+      throw new Error('Backend API error, using mock');
     } catch (error) {
-      console.warn('Using mock payment intent for demo:', error);
+      // This catches both network errors (like 404) and other fetch errors
+      console.warn('Backend not available, using mock payment intent for demo:', error instanceof Error ? error.message : 'Unknown error');
       
       // Use mock backend for demonstration
       const mockResponse = await mockCreatePaymentIntent({
@@ -66,21 +74,50 @@ class TicketService {
     }
   }
 
-  // Save ticket purchase to Firebase
+  // Save ticket purchase to Firebase (with fallback to localStorage for demo)
   async saveTicketPurchase(purchaseData: Omit<TicketPurchase, 'id' | 'purchaseDate'>): Promise<string> {
     try {
+      console.log('🔥 Attempting to save to Firebase...');
       const docRef = await addDoc(collection(db, 'ticketPurchases'), {
         ...purchaseData,
         purchaseDate: serverTimestamp(),
+        createdAt: new Date().toISOString(),
       });
+      console.log('✅ Successfully saved to Firebase with ID:', docRef.id);
       return docRef.id;
     } catch (error) {
-      console.error('Error saving ticket purchase:', error);
-      throw new Error('Failed to save ticket purchase');
+      console.warn('⚠️ Firebase save failed, using localStorage fallback:', error);
+      
+      // Check if it's a specific Firebase error
+      if (error instanceof Error) {
+        if (error.message.includes('permission-denied')) {
+          console.error('🚫 Firebase permission denied. Check Firestore rules.');
+        } else if (error.message.includes('unavailable')) {
+          console.error('📡 Firebase service unavailable. Check internet connection.');
+        } else if (error.message.includes('unauthenticated')) {
+          console.error('🔐 Firebase authentication required.');
+        }
+      }
+      
+      // Fallback to localStorage for demo purposes
+      const purchaseId = `demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const purchaseWithId: TicketPurchase = {
+        ...purchaseData,
+        id: purchaseId,
+        purchaseDate: new Date().toISOString(),
+      };
+      
+      // Save to localStorage
+      const existingPurchases = JSON.parse(localStorage.getItem('demo_purchases') || '[]');
+      existingPurchases.push(purchaseWithId);
+      localStorage.setItem('demo_purchases', JSON.stringify(existingPurchases));
+      console.log('💾 Saved to localStorage with ID:', purchaseId);
+      
+      return purchaseId;
     }
   }
 
-  // Update payment status
+  // Update payment status (with fallback to localStorage for demo)
   async updatePaymentStatus(purchaseId: string, status: TicketPurchase['paymentStatus']): Promise<void> {
     try {
       const purchaseRef = doc(db, 'ticketPurchases', purchaseId);
@@ -89,12 +126,50 @@ class TicketService {
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error('Error updating payment status:', error);
-      throw new Error('Failed to update payment status');
+      console.warn('Firebase not available, updating local storage for demo:', error);
+      
+      // Fallback to localStorage for demo purposes
+      if (purchaseId.startsWith('demo_')) {
+        const existingPurchases = JSON.parse(localStorage.getItem('demo_purchases') || '[]');
+        const updatedPurchases = existingPurchases.map((purchase: TicketPurchase) => 
+          purchase.id === purchaseId 
+            ? { ...purchase, paymentStatus: status, updatedAt: new Date().toISOString() }
+            : purchase
+        );
+        localStorage.setItem('demo_purchases', JSON.stringify(updatedPurchases));
+      }
     }
   }
 
-  // Get ticket purchase by ID
+  // Update customer information (with fallback to localStorage for demo)
+  async updatePurchaseCustomerInfo(purchaseId: string, customerInfo: {
+    customerEmail: string;
+    customerName: string;
+    customerPhone: string;
+  }): Promise<void> {
+    try {
+      const purchaseRef = doc(db, 'ticketPurchases', purchaseId);
+      await updateDoc(purchaseRef, {
+        ...customerInfo,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.warn('Firebase not available, updating local storage for demo:', error);
+      
+      // Fallback to localStorage for demo purposes
+      if (purchaseId.startsWith('demo_')) {
+        const existingPurchases = JSON.parse(localStorage.getItem('demo_purchases') || '[]');
+        const updatedPurchases = existingPurchases.map((purchase: TicketPurchase) => 
+          purchase.id === purchaseId 
+            ? { ...purchase, ...customerInfo, updatedAt: new Date().toISOString() }
+            : purchase
+        );
+        localStorage.setItem('demo_purchases', JSON.stringify(updatedPurchases));
+      }
+    }
+  }
+
+  // Get ticket purchase by ID (with fallback to localStorage for demo)
   async getTicketPurchase(purchaseId: string): Promise<TicketPurchase | null> {
     try {
       const purchaseRef = doc(db, 'ticketPurchases', purchaseId);
@@ -109,8 +184,16 @@ class TicketService {
       
       return null;
     } catch (error) {
-      console.error('Error getting ticket purchase:', error);
-      throw new Error('Failed to get ticket purchase');
+      console.warn('Firebase not available, checking local storage for demo:', error);
+      
+      // Fallback to localStorage for demo purposes
+      if (purchaseId.startsWith('demo_')) {
+        const existingPurchases = JSON.parse(localStorage.getItem('demo_purchases') || '[]');
+        const purchase = existingPurchases.find((p: TicketPurchase) => p.id === purchaseId);
+        return purchase || null;
+      }
+      
+      return null;
     }
   }
 

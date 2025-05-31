@@ -1,14 +1,13 @@
-import React, { useState,  } from 'react';
+import React, { useState } from 'react';
 import {
   PaymentElement,
   useStripe,
   useElements,
-  AddressElement,
 } from '@stripe/react-stripe-js';
 import { motion } from 'framer-motion';
 import { CreditCard, Lock, Mail, User,  } from 'lucide-react';
 import { ticketService } from '../services/ticketService';
-import type { TicketPurchase } from '../services/ticketService';
+import type { PaymentIntent } from '../services/ticketService';
 
 interface CheckoutFormProps {
   ticketTier: {
@@ -17,14 +16,18 @@ interface CheckoutFormProps {
     price: number;
   };
   quantity: number;
+  paymentIntent: PaymentIntent;
+  purchaseId: string;
   onSuccess: (purchaseId: string) => void;
   onError: (error: string) => void;
   onCancel: () => void;
 }
 
-export const CheckoutForm: React.FC<CheckoutFormProps> = ({
+const CheckoutForm: React.FC<CheckoutFormProps> = ({
   ticketTier,
   quantity,
+  paymentIntent,
+  purchaseId,
   onSuccess,
   onError,
   onCancel,
@@ -56,23 +59,12 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
         throw new Error('Please fill in all required fields');
       }
 
-      // Create payment intent and save initial purchase record
-      const paymentIntent = await ticketService.createPaymentIntent(totalAmount);
-      
-      const purchaseData: Omit<TicketPurchase, 'id' | 'purchaseDate'> = {
-        ticketTierId: ticketTier.id,
-        ticketTierName: ticketTier.name,
-        price: ticketTier.price,
-        quantity,
-        totalAmount,
+      // Update purchase record with customer information
+      await ticketService.updatePurchaseCustomerInfo(purchaseId, {
         customerEmail: customerInfo.email,
         customerName: customerInfo.name,
         customerPhone: customerInfo.phone,
-        paymentIntentId: paymentIntent.id,
-        paymentStatus: 'pending',
-      };
-
-      const purchaseId = await ticketService.saveTicketPurchase(purchaseData);
+      });
 
       // Confirm payment with Stripe
       const { error } = await stripe.confirmPayment({
@@ -112,12 +104,12 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-2xl mx-auto bg-slate-800/50 backdrop-blur-md rounded-xl p-8 border border-purple-500/20"
+      className="bg-slate-800/50 backdrop-blur-md rounded-xl p-8 border border-purple-500/20"
     >
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2">Complete Your Purchase</h2>
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-white mb-2">Payment Details</h2>
         <p className="text-gray-300">
-          {quantity}x {ticketTier.name} Ticket{quantity > 1 ? 's' : ''} - ${totalAmount}
+          Complete your purchase securely below
         </p>
       </div>
 
@@ -180,12 +172,34 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             Billing Address
           </h3>
           <div className="bg-slate-700/50 rounded-lg p-4">
-            <AddressElement
-              options={{
-                mode: 'billing',
-                allowedCountries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES'],
-              }}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Country
+                </label>
+                <select className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                  <option value="US">United States</option>
+                  <option value="CA">Canada</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="AU">Australia</option>
+                  <option value="DE">Germany</option>
+                  <option value="FR">France</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  ZIP/Postal Code
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Enter ZIP/Postal code"
+                />
+              </div>
+            </div>
+            <p className="text-sm text-gray-400 mt-2">
+              Note: For demo purposes, billing address collection is simplified. In production, use Stripe's AddressElement for complete address collection.
+            </p>
           </div>
         </div>
 
@@ -199,32 +213,18 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             <PaymentElement
               options={{
                 layout: 'tabs',
+                paymentMethodOrder: ['card'],
+                // Disable payment request button (Apple Pay/Google Pay) for development
+                wallets: {
+                  applePay: 'never',
+                  googlePay: 'never',
+                },
               }}
             />
           </div>
         </div>
 
-        {/* Order Summary */}
-        <div className="bg-slate-700/30 rounded-lg p-6 border border-slate-600">
-          <h3 className="text-lg font-semibold text-white mb-4">Order Summary</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between text-gray-300">
-              <span>{ticketTier.name} Ticket</span>
-              <span>${ticketTier.price}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Quantity</span>
-              <span>{quantity}</span>
-            </div>
-            <div className="border-t border-slate-600 pt-2 mt-2">
-              <div className="flex justify-between text-xl font-bold text-white">
-                <span>Total</span>
-                <span>${totalAmount}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
+        
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">
           <motion.button
@@ -252,7 +252,7 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             ) : (
               <div className="flex items-center">
                 <Lock className="w-5 h-5 mr-2" />
-                Complete Purchase - ${totalAmount}
+                Pay ${totalAmount}
               </div>
             )}
           </motion.button>

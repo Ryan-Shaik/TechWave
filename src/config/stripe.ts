@@ -6,8 +6,7 @@ const stripePublishableKey = 'pk_test_51RUhIz2ZEqbw8uHwBs3U94ICQn849vOCVTdwlEAD8
 export const stripePromise = loadStripe(stripePublishableKey);
 
 export const STRIPE_CONFIG = {
-  publishableKey: stripePublishableKey,
-  // Add other Stripe configuration options here
+  // Stripe Elements configuration options
   appearance: {
     theme: 'night' as const,
     variables: {

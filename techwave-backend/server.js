@@ -1,14 +1,28 @@
+require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const admin = require('firebase-admin');
 
 const app = express();
+
+// Middleware
+app.use(cors({
+  origin: 'http://localhost:5173', // Vite dev server
+  credentials: true
+}));
 app.use(express.json());
 
-// Initialize Firebase Admin
-admin.initializeApp({
-  credential: admin.credential.cert(require('./firebase-service-account.json'))
-});
+// Initialize Firebase Admin (optional - comment out if no Firebase service account)
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(require('./firebase-service-account.json'))
+  });
+  console.log('Firebase Admin initialized');
+} catch (error) {
+  console.warn('Firebase Admin initialization failed:', error.message);
+  console.log('Continuing without Firebase Admin...');
+}
 
 // Create payment intent
 app.post('/api/create-payment-intent', async (req, res) => {
@@ -54,6 +68,19 @@ app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), (req, 
   res.json({received: true});
 });
 
-app.listen(3001, () => {
-  console.log('Server running on port 3001');
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    stripe: !!process.env.STRIPE_SECRET_KEY,
+    timestamp: new Date().toISOString()
+  });
+});
+
+const PORT = process.env.PORT || 3001;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Stripe configured: ${!!process.env.STRIPE_SECRET_KEY}`);
+  console.log(`Environment loaded: ${!!process.env.STRIPE_SECRET_KEY ? 'Yes' : 'No'}`);
 });

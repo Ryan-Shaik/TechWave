@@ -21,10 +21,24 @@ export const createPaymentIntent = async (
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // Mock response - in a real app, this would call your backend
+  // Generate properly formatted mock IDs that match Stripe's actual format
+  // Stripe payment intent IDs are typically 27 characters long after 'pi_'
+  const generateRandomString = (length: number) => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const paymentIntentId = generateRandomString(27);
+  const secretPart = generateRandomString(24);
+  
+  // Mock response with proper Stripe-like format
   return {
-    id: `pi_mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    client_secret: `pi_mock_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`,
+    id: `pi_${paymentIntentId}`,
+    client_secret: `pi_${paymentIntentId}_secret_${secretPart}`,
     amount: request.amount,
     currency: request.currency,
     status: 'requires_payment_method',

@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Check, Star, Clock, Users, Gift, ShoppingCart, Plus, Minus } from 'lucide-react';
-import { Elements } from '@stripe/react-stripe-js';
-import { stripePromise, STRIPE_CONFIG } from '../config/stripe';
-import CheckoutForm from './CheckoutForm';
-import TicketConfirmation from './TicketConfirmation';
 
 interface TicketTier {
   id: string;
@@ -20,12 +17,9 @@ interface TicketTier {
 }
 
 const TicketSection: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedTier, setSelectedTier] = useState<string>('standard');
   const [quantity, setQuantity] = useState<number>(1);
-  const [showCheckout, setShowCheckout] = useState<boolean>(false);
-  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
-  const [purchaseId, setPurchaseId] = useState<string>('');
-  const [checkoutError, setCheckoutError] = useState<string>('');
 
   const ticketTiers: TicketTier[] = [
     {
@@ -112,29 +106,7 @@ const TicketSection: React.FC = () => {
   };
 
   const handlePurchaseClick = () => {
-    setShowCheckout(true);
-    setCheckoutError('');
-  };
-
-  const handleCheckoutSuccess = (id: string) => {
-    setPurchaseId(id);
-    setShowCheckout(false);
-    setShowConfirmation(true);
-  };
-
-  const handleCheckoutError = (error: string) => {
-    setCheckoutError(error);
-  };
-
-  const handleCheckoutCancel = () => {
-    setShowCheckout(false);
-    setCheckoutError('');
-  };
-
-  const handleConfirmationClose = () => {
-    setShowConfirmation(false);
-    setPurchaseId('');
-    setQuantity(1);
+    navigate(`/checkout?tier=${selectedTier}&quantity=${quantity}`);
   };
 
   return (
@@ -296,13 +268,7 @@ const TicketSection: React.FC = () => {
               </div>
             </div>
 
-            {/* Error Message */}
-            {checkoutError && (
-              <div className="mb-6 p-4 bg-red-900/20 border border-red-500/20 rounded-lg">
-                <p className="text-red-400">{checkoutError}</p>
-              </div>
-            )}
-            
+                        
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -377,29 +343,7 @@ const TicketSection: React.FC = () => {
         </motion.div>
       </div>
 
-      {/* Checkout Modal */}
-      {showCheckout && selectedTicketTier && (
-        <Elements stripe={stripePromise} options={STRIPE_CONFIG}>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <CheckoutForm
-              ticketTier={selectedTicketTier}
-              quantity={quantity}
-              onSuccess={handleCheckoutSuccess}
-              onError={handleCheckoutError}
-              onCancel={handleCheckoutCancel}
-            />
-          </div>
-        </Elements>
-      )}
-
-      {/* Confirmation Modal */}
-      {showConfirmation && purchaseId && (
-        <TicketConfirmation
-          purchaseId={purchaseId}
-          onClose={handleConfirmationClose}
-        />
-      )}
-    </section>
+          </section>
   );
 };
 
