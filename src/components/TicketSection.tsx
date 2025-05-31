@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Star, Clock, Users, Gift } from 'lucide-react';
+import { Check, Star, Clock, Users, Gift, ShoppingCart, Plus, Minus } from 'lucide-react';
+import { Elements } from '@stripe/react-stripe-js';
+import { stripePromise, STRIPE_CONFIG } from '../config/stripe';
+import CheckoutForm from './CheckoutForm';
+import TicketConfirmation from './TicketConfirmation';
 
 interface TicketTier {
   id: string;
@@ -17,6 +21,11 @@ interface TicketTier {
 
 const TicketSection: React.FC = () => {
   const [selectedTier, setSelectedTier] = useState<string>('standard');
+  const [quantity, setQuantity] = useState<number>(1);
+  const [showCheckout, setShowCheckout] = useState<boolean>(false);
+  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+  const [purchaseId, setPurchaseId] = useState<string>('');
+  const [checkoutError, setCheckoutError] = useState<string>('');
 
   const ticketTiers: TicketTier[] = [
     {
@@ -91,6 +100,41 @@ const TicketSection: React.FC = () => {
       y: 0,
       opacity: 1,
     },
+  };
+
+  const selectedTicketTier = ticketTiers.find(tier => tier.id === selectedTier);
+
+  const handleQuantityChange = (change: number) => {
+    const newQuantity = quantity + change;
+    if (newQuantity >= 1 && newQuantity <= 10) {
+      setQuantity(newQuantity);
+    }
+  };
+
+  const handlePurchaseClick = () => {
+    setShowCheckout(true);
+    setCheckoutError('');
+  };
+
+  const handleCheckoutSuccess = (id: string) => {
+    setPurchaseId(id);
+    setShowCheckout(false);
+    setShowConfirmation(true);
+  };
+
+  const handleCheckoutError = (error: string) => {
+    setCheckoutError(error);
+  };
+
+  const handleCheckoutCancel = () => {
+    setShowCheckout(false);
+    setCheckoutError('');
+  };
+
+  const handleConfirmationClose = () => {
+    setShowConfirmation(false);
+    setPurchaseId('');
+    setQuantity(1);
   };
 
   return (
@@ -223,13 +267,51 @@ const TicketSection: React.FC = () => {
               networking events, meals, and exclusive conference materials.
             </p>
             
+            {/* Quantity Selector */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="bg-slate-700/50 rounded-lg p-4 flex items-center space-x-4">
+                <span className="text-white font-medium">Quantity:</span>
+                <div className="flex items-center space-x-3">
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => handleQuantityChange(-1)}
+                    disabled={quantity <= 1}
+                    className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </motion.button>
+                  <span className="text-white font-bold text-xl w-8 text-center">{quantity}</span>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => handleQuantityChange(1)}
+                    disabled={quantity >= 10}
+                    className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </motion.button>
+                </div>
+                <span className="text-gray-400 text-sm">(Max 10 tickets)</span>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {checkoutError && (
+              <div className="mb-6 p-4 bg-red-900/20 border border-red-500/20 rounded-lg">
+                <p className="text-red-400">{checkoutError}</p>
+              </div>
+            )}
+            
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200 pulse-glow"
+                onClick={handlePurchaseClick}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200 pulse-glow flex items-center"
               >
-                Purchase {ticketTiers.find(t => t.id === selectedTier)?.name} Ticket - ${ticketTiers.find(t => t.id === selectedTier)?.price}
+                <ShoppingCart className="w-5 h-5 mr-2" />
+                Purchase {quantity}x {selectedTicketTier?.name} - ${(selectedTicketTier?.price || 0) * quantity}
               </motion.button>
               
               <div className="text-sm text-gray-400">
@@ -294,8 +376,32 @@ const TicketSection: React.FC = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* Checkout Modal */}
+      {showCheckout && selectedTicketTier && (
+        <Elements stripe={stripePromise} options={STRIPE_CONFIG}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <CheckoutForm
+              ticketTier={selectedTicketTier}
+              quantity={quantity}
+              onSuccess={handleCheckoutSuccess}
+              onError={handleCheckoutError}
+              onCancel={handleCheckoutCancel}
+            />
+          </div>
+        </Elements>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmation && purchaseId && (
+        <TicketConfirmation
+          purchaseId={purchaseId}
+          onClose={handleConfirmationClose}
+        />
+      )}
     </section>
   );
 };
 
 export default TicketSection;
+
