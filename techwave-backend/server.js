@@ -8,7 +8,9 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5173', // Vite dev server
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://your-frontend-domain.vercel.app'] 
+    : ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true
 }));
 app.use(express.json());
