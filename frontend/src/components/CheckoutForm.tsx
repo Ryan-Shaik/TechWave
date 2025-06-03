@@ -17,7 +17,7 @@ interface CheckoutFormProps {
     price: number;
   };
   quantity: number;
-  paymentIntent: PaymentIntent;
+  // paymentIntent: PaymentIntent;
   purchaseId: string;
   onSuccess: (purchaseId: string) => void;
   onError: (error: string) => void;
@@ -27,7 +27,7 @@ interface CheckoutFormProps {
 const CheckoutForm: React.FC<CheckoutFormProps> = ({
   ticketTier,
   quantity,
-  
+  // paymentIntent,
   purchaseId,
   onSuccess,
   onError,
@@ -45,7 +45,7 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
   });
   
   const totalAmount = ticketTier.price * quantity;
-
+  
   // Monitor when Stripe Elements are ready
   useEffect(() => {
     if (stripe && elements) {
