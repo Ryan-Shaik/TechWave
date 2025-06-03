@@ -22,6 +22,35 @@ A modern React + TypeScript + Vite application for the TechWave 2025 conference 
    npm run dev
    ```
 
+## Deployment
+
+### Deploy to Vercel
+
+1. **Push your code to GitHub** (make sure environment variables are not committed)
+
+2. **Connect to Vercel:**
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Vercel will automatically detect it's a Vite project
+
+3. **Configure Environment Variables in Vercel:**
+   - In your Vercel project dashboard, go to Settings → Environment Variables
+   - Add all the environment variables from `.env.example`:
+     ```
+     VITE_STRIPE_PUBLISHABLE_KEY=your_actual_stripe_key
+     VITE_FIREBASE_API_KEY=your_actual_firebase_key
+     VITE_FIREBASE_AUTH_DOMAIN=your_actual_domain
+     VITE_FIREBASE_PROJECT_ID=your_actual_project_id
+     VITE_FIREBASE_STORAGE_BUCKET=your_actual_bucket
+     VITE_FIREBASE_MESSAGING_SENDER_ID=your_actual_sender_id
+     VITE_FIREBASE_APP_ID=your_actual_app_id
+     VITE_FIREBASE_MEASUREMENT_ID=your_actual_measurement_id
+     ```
+
+4. **Deploy:**
+   - Vercel will automatically build and deploy your project
+   - Your app will be available at `https://your-project-name.vercel.app`
+
 ## Environment Variables
 
 The following environment variables are required:

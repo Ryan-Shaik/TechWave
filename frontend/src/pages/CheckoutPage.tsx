@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Check, Star, Clock, Users, Gift } from 'lucide-react';
+import { ArrowLeft, Check, Star, Clock, Users } from 'lucide-react';
 import { Elements } from '@stripe/react-stripe-js';
 import { stripePromise, STRIPE_CONFIG } from '../config/stripe';
 import { ticketService } from '../services/ticketService';
