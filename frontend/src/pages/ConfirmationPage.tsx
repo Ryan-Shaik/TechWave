@@ -79,6 +79,8 @@ const ConfirmationPage: React.FC = () => {
   }
 
   if (error || !purchase) {
+    const errorMessage = error || (!purchaseId ? 'No purchase ID provided in URL' : 'Purchase not found');
+    
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
         <motion.div
@@ -87,8 +89,15 @@ const ConfirmationPage: React.FC = () => {
           className="bg-slate-800/50 backdrop-blur-md rounded-xl p-8 text-center max-w-md border border-purple-500/20"
         >
           <div className="text-red-400 text-6xl mb-4">⚠️</div>
-          <h3 className="text-xl font-bold text-white mb-2">Error</h3>
-          <p className="text-gray-300 mb-6">{error}</p>
+          <h3 className="text-xl font-bold text-white mb-2">
+            {!purchaseId ? 'Invalid URL' : 'Purchase Not Found'}
+          </h3>
+          <p className="text-gray-300 mb-6">{errorMessage}</p>
+          {!purchaseId && (
+            <p className="text-gray-400 text-sm mb-6">
+              This page requires a valid purchase ID. Please complete a purchase first.
+            </p>
+          )}
           <button
             onClick={handleBackToHome}
             className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"

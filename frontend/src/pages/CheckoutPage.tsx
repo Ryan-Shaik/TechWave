@@ -201,6 +201,7 @@ const CheckoutPage: React.FC = () => {
     clientSecret: paymentIntent.client_secret,
     // Disable payment request button (Apple Pay/Google Pay) for development
     paymentMethodCreation: 'manual' as const,
+    loader: 'auto' as const,
   };
 
   return (
@@ -368,7 +369,11 @@ const CheckoutPage: React.FC = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
           >
-            <Elements stripe={stripePromise} options={elementsOptions}>
+            <Elements 
+              stripe={stripePromise} 
+              options={elementsOptions}
+              key={paymentIntent.client_secret} // Force re-render if payment intent changes
+            >
               <CheckoutForm
                 ticketTier={selectedTicketTier}
                 quantity={quantity}

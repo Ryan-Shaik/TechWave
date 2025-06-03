@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   PaymentElement,
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
 import { motion } from 'framer-motion';
-import { CreditCard, Lock, Mail, User,  } from 'lucide-react';
+import { CreditCard, Lock, Mail, User } from 'lucide-react';
 import { ticketService } from '../services/ticketService';
 import type { PaymentIntent } from '../services/ticketService';
+import StripeDebug from './StripeDebug';
 
 interface CheckoutFormProps {
   ticketTier: {
@@ -26,6 +27,7 @@ interface CheckoutFormProps {
 const CheckoutForm: React.FC<CheckoutFormProps> = ({
   ticketTier,
   quantity,
+  paymentIntent,
   purchaseId,
   onSuccess,
   onError,
@@ -35,6 +37,7 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
   const elements = useElements();
   
   const [isLoading, setIsLoading] = useState(false);
+  const [isElementsReady, setIsElementsReady] = useState(false);
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
     email: '',
@@ -43,10 +46,18 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
   
   const totalAmount = ticketTier.price * quantity;
 
+  // Monitor when Stripe Elements are ready
+  useEffect(() => {
+    if (stripe && elements) {
+      setIsElementsReady(true);
+    }
+  }, [stripe, elements]);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!stripe || !elements) {
+      onError('Payment system not ready. Please wait a moment and try again.');
       return;
     }
 
@@ -58,6 +69,8 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
         throw new Error('Please fill in all required fields');
       }
 
+      console.log('Starting payment process...');
+
       // Update purchase record with customer information
       await ticketService.updatePurchaseCustomerInfo(purchaseId, {
         customerEmail: customerInfo.email,
@@ -65,26 +78,42 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
         customerPhone: customerInfo.phone,
       });
 
+      console.log('Customer info updated, confirming payment...');
+
       // Confirm payment with Stripe
-      const { error } = await stripe.confirmPayment({
+      const { error, paymentIntent: confirmedPaymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/ticket-confirmation?purchase_id=${purchaseId}`,
+          return_url: `${window.location.origin}/confirmation?purchase_id=${purchaseId}`,
           receipt_email: customerInfo.email,
         },
         redirect: 'if_required',
       });
 
       if (error) {
+        console.error('Payment confirmation error:', error);
         // Update payment status to failed
         await ticketService.updatePaymentStatus(purchaseId, 'failed');
-        throw new Error(error.message || 'Payment failed');
+        
+        // Provide more specific error messages
+        let errorMessage = 'Payment failed';
+        if (error.type === 'card_error') {
+          errorMessage = error.message || 'Your card was declined';
+        } else if (error.type === 'validation_error') {
+          errorMessage = 'Please check your payment information';
+        } else {
+          errorMessage = error.message || 'Payment failed';
+        }
+        
+        throw new Error(errorMessage);
       } else {
+        console.log('Payment confirmed successfully:', confirmedPaymentIntent);
         // Payment succeeded
         await ticketService.updatePaymentStatus(purchaseId, 'succeeded');
         onSuccess(purchaseId);
       }
     } catch (err) {
+      console.error('Payment process error:', err);
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       onError(errorMessage);
     } finally {
@@ -114,6 +143,9 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Debug Information */}
+        <StripeDebug />
+        
         {/* Customer Information */}
         <div className="space-y-4">
           <h3 className="text-xl font-semibold text-white flex items-center">
@@ -209,12 +241,31 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
             <CreditCard className="w-5 h-5 mr-2" />
             Payment Information
           </h3>
-          <div className="bg-slate-700/50 rounded-lg p-4">
-            <PaymentElement
-              options={{
-                layout: 'tabs',
-              }}
-            />
+          <div className="bg-slate-700/50 rounded-lg p-4 min-h-[200px]">
+            {!isElementsReady ? (
+              <div className="flex items-center justify-center h-48">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                <span className="ml-3 text-gray-300">Loading payment form...</span>
+              </div>
+            ) : (
+              <PaymentElement
+                options={{
+                  layout: 'tabs',
+                  paymentMethodOrder: ['card'],
+                }}
+                onReady={() => {
+                  console.log('PaymentElement is ready');
+                }}
+                onLoadError={(error) => {
+                  console.error('PaymentElement load error:', error);
+                  onError('Failed to load payment form. Please refresh the page.');
+                }}
+              />
+            )}
+          </div>
+          <div className="text-sm text-gray-400">
+            <p>💳 For testing, use card number: <span className="font-mono text-purple-400">4242 4242 4242 4242</span></p>
+            <p>Use any future expiry date and any 3-digit CVC.</p>
           </div>
         </div>
 
@@ -253,7 +304,7 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
           
           <motion.button
             type="submit"
-            disabled={!stripe || isLoading}
+            disabled={!stripe || !elements || !isElementsReady || isLoading}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="flex-1 py-4 px-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
@@ -262,6 +313,11 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                 Processing...
+              </div>
+            ) : !isElementsReady ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Loading...
               </div>
             ) : (
               <div className="flex items-center">
