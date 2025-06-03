@@ -27,7 +27,7 @@ interface CheckoutFormProps {
 const CheckoutForm: React.FC<CheckoutFormProps> = ({
   ticketTier,
   quantity,
-  paymentIntent,
+  // paymentIntent,
   purchaseId,
   onSuccess,
   onError,
